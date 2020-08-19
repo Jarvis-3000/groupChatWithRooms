@@ -1,67 +1,102 @@
-const chatForm = document.getElementById('chat-form');
-const chatMessages = document.querySelector('.chat-messages');
-const roomName = document.getElementById('room-name');
-const userList = document.getElementById('users');
-
-// Get username and room from URL
-const { username, room } = Qs.parse(location.search, {
-  ignoreQueryPrefix: true
-});
-
+const Moment = new moment();
 const socket = io();
+const form = document.querySelector("form");
+const inp = document.querySelector(".inp");
+const message_box = document.querySelector(".messages");
+const room_name=document.querySelector("#room-name")
+const userList=document.querySelector(".names")
 
-// Join chatroom
-socket.emit('joinRoom', { username, room });
+//get username and room name from query(URL)
+const {username,room}=Qs.parse(location.search,{
+    ignoreQueryPrefix:true
+})
 
-// Get room and users
-socket.on('roomUsers', ({ room, users }) => {
-  outputRoomName(room);
-  outputUsers(users);
+
+socket.emit("joinRoom", {username, room});
+
+//get room and roomUsers
+socket.on("room-info",(roomUsers)=>{
+  // outputRoom(room);
+  outputRoomUsers(roomUsers);
+})
+
+//taking input value
+inp.focus();
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+
+  const input = inp.value;
+
+  if (input) {
+    inp.value = "";
+    inp.focus();
+
+    const msg =input;
+    socket.emit("message", msg);
+
+    //function to add the message into the message-box
+    //time from moment
+    const time = Moment.format("h:mm:a");
+    output({ name: "You", time: time, msg: input });
+  }
 });
 
-// Message from server
-socket.on('message', message => {
-  console.log(message);
-  outputMessage(message);
+socket.on("message", (data) => {
+  // console.log(data);
 
-  // Scroll down
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+  //function to add the message into the message-box
+  output(data);
 });
 
-// Message submit
-chatForm.addEventListener('submit', e => {
-  e.preventDefault();
+//function to add the message into the message-box
+function output(data) {
+  const messsage = `
+            <div class="person-name">${data.name} <span>${data.time}</span></div>
+            <div class="person-message">${data.msg}</div>
+            `;
+  const div = document.createElement("div");
+  div.className = "message";
+  div.innerHTML = messsage;
 
-  // Get message text
-  const msg = e.target.elements.msg.value;
+  message_box.appendChild(div);
 
-  // Emit message to server
-  socket.emit('chatMessage', msg);
-
-  // Clear input
-  e.target.elements.msg.value = '';
-  e.target.elements.msg.focus();
-});
-
-// Output message to DOM
-function outputMessage(message) {
-  const div = document.createElement('div');
-  div.classList.add('message');
-  div.innerHTML = `<p class="meta">${message.username} <span>${message.time}</span></p>
-  <p class="text">
-    ${message.text}
-  </p>`;
-  document.querySelector('.chat-messages').appendChild(div);
+  //scroll down
+  message_box.scrollTop = message_box.scrollHeight;
 }
 
-// Add room name to DOM
-function outputRoomName(room) {
-  roomName.innerText = room;
+var time;
+
+function typingDisplay(username) {
+  document.querySelector(".typing").innerHTML = `${username} typing...`;
+  document.querySelector(".typing").style.display = "block";
+
+  clearTimeout(time);
+
+  time = setTimeout(() => {
+    document.querySelector(".typing").style.display = "none";
+  }, 2000);
 }
 
-// Add users to DOM
-function outputUsers(users) {
-  userList.innerHTML = `
-    ${users.map(user => `<li>${user.username}</li>`).join('')}
-  `;
+inp.addEventListener("keyup", (event) => {
+  if (event.keyCode != 13) {
+    socket.emit("typing", username);
+  }
+});
+
+socket.on("typing", (username) => {
+  typingDisplay(username);
+});
+
+
+//room and roomUsers adding and deleting list
+
+//assignning room name
+// function outputRoom(room){
+  room_name.textContent=room
+// }
+
+function outputRoomUsers(users){
+  userList.innerHTML=`
+    ${users.map(user=>`<li>${user.username}</li>`).join('')}
+  `
 }
